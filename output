@@ -1,0 +1,20 @@
+Loaded 25000 reviews
+Positive: 12500
+Negative: 12500
+                                              review  sentiment
+0  Bromwell High is a cartoon comedy. It ran at t...          1
+1  Homelessness (or Houselessness as George Carli...          1
+2  Brilliant over-acting by Lesley Ann Warren. Be...          1
+3  This is easily the most underrated film inn th...          1
+4  This is not the typical Mel Brooks film. It wa...          1
+
+==================================================
+SETTING UP TEXT DATA FOR CLUSTERING
+==================================================
+Original text data shape: (25000,)
+After TF-IDF vectorization: (25000, 2000)
+Explained variance ratio: 1.93%
+
+Clustering Performance:
+Adjusted Rand Index: 0.107
+Normalized Mutual Info: 0.079

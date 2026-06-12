@@ -1,62 +1,33 @@
 import numpy as np
-import scipy.io
 import os
 from sklearn.cluster import KMeans
-from sklearn.cluster import DBSCAN
 import matplotlib.pyplot as plt
-import math
-from sklearn import metrics
-from scipy.stats import zscore
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 import seaborn as sns
-from datasets import load_dataset
 from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-
-# Set Kaggle API token
-os.environ['KAGGLE_API_TOKEN'] = 'KGAT_d3d79d12cd6971f4edef5cb83dc2ba8d'
-
 import kagglehub
-
-# Download the dataset
-path = kagglehub.dataset_download("abdallahwagih/imdb-movie-reviews")
-print(f"Dataset downloaded to: {path}")
-
-# Navigate to the aclImdb folder
-acl_path = os.path.join(path, "aclImdb")
-
-reviews = []
-sentiments = []
-
-# Load training reviews
-for label, sentiment_value in [("pos", 1), ("neg", 0)]:
-    folder_path = os.path.join(acl_path, "train", label)
-    
-    if os.path.exists(folder_path):
-        for filename in os.listdir(folder_path):
-            if filename.endswith(".txt"):
-                file_path = os.path.join(folder_path, filename)
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    reviews.append(f.read())
-                    sentiments.append(sentiment_value)
-
-# Create DataFrame
-df = pd.DataFrame({'review': reviews, 'sentiment': sentiments})
-print(f"Loaded {len(df)} reviews")
-print(f"Positive: {sum(df['sentiment'])}")
-print(f"Negative: {len(df) - sum(df['sentiment'])}")
-print(df.head())
-
-
-
-# Καθαρισμος κειμενου
-# Προσθήκη καθαρισμού κειμένου (ΑΝ ΔΕΝ ΤΟ ΕΧΕΙΣ ΗΔΗ)
 import re
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
+from sklearn.feature_extraction.text import CountVectorizer
+from mlxtend.frequent_patterns import apriori, association_rules
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import GaussianNB      
+from sklearn.neural_network import MLPClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import confusion_matrix, roc_curve, auc
+from sklearn.feature_extraction.text import CountVectorizer
+from mlxtend.frequent_patterns import apriori, association_rules
+import re
+from collections import Counter
+import math
+from sklearn import metrics
+import time
 
 nltk.download('stopwords', quiet=True)
 nltk.download('wordnet', quiet=True)
@@ -64,128 +35,194 @@ nltk.download('wordnet', quiet=True)
 lemmatizer = WordNetLemmatizer()
 stop_words = set(stopwords.words('english'))
 
-def clean_text(text):
-    # Αφαίρεση HTML tags
+#Kaggle API token
+os.environ['KAGGLE_API_TOKEN'] = 'KGAT_d3d79d12cd6971f4edef5cb83dc2ba8d'
+path = kagglehub.dataset_download("abdallahwagih/imdb-movie-reviews")
+print(f"Dataset downloaded to: {path}")
+aclpth = os.path.join(path, "aclImdb")
+
+reviews = []
+sentiments = []
+
+# Load training reviews
+for label, sentiment_value in [("pos", 1), ("neg", 0)]:
+    fldpth = os.path.join(aclpth, "train", label)
+    
+    if os.path.exists(fldpth):
+        for filename in os.listdir(fldpth):
+            if filename.endswith(".txt"):
+                flpth = os.path.join(fldpth, filename)
+                with open(flpth, 'r', encoding='utf-8') as f:
+                    reviews.append(f.read())
+                    sentiments.append(sentiment_value)
+
+dtfrm = pd.DataFrame({'review': reviews, 'sentiment': sentiments})
+print(f"Φορτώθηκαν {len(dtfrm)} reviews")
+print(f"Θετικά: {sum(dtfrm['sentiment'])}")
+print(f"Αρνητικά: {len(dtfrm) - sum(dtfrm['sentiment'])}")
+print(dtfrm.head())
+
+#αφαιρεση αχρηστων χαρακτηρων και χαρακτηριστικων καθως και stopwords και ληματοποιηση
+def cleanup(text):
     text = re.sub(r'<.*?>', '', text)
-    # Μόνο γράμματα
     text = re.sub(r'[^a-zA-Z\s]', '', text)
-    # Lowercase
     text = text.lower()
-    # Tokenization
     tokens = text.split()
-    # Αφαίρεση stopwords & lemmatization
     tokens = [lemmatizer.lemmatize(w) for w in tokens if w not in stop_words and len(w) > 2]
     return ' '.join(tokens)
 
-df['cleaned_review'] = df['review'].apply(clean_text)
+dtfrm['cleanreview'] = dtfrm['review'].apply(cleanup)
 
 
-def setup_text_data(df, text_column='review', label_column='sentiment', max_features=1000):
-    """
-    Setup text data for clustering/analysis
-    
-    Parameters:
-    - df: DataFrame with text reviews
-    - text_column: name of column containing text reviews
-    - label_column: name of column containing labels (for visualization)
-    - max_features: number of features for TF-IDF (reduce for faster computation)
-    """
-    
-    # Step 1: Extract text and labels
-    X_text = df[text_column].values
-    y = df[label_column].values if label_column in df.columns else None
-    
-    # Step 2: Convert text to numerical features using TF-IDF
+def prepareclust(dtfrm, text_column='review', label_column='sentiment', max_features=1000):
+    #μετατροπη κειμένων σε κάτι κλιμακώσιμο
+    X_text = dtfrm[text_column].values
+    y = dtfrm[label_column].values if label_column in dtfrm.columns else None
     tfidf = TfidfVectorizer(max_features=max_features, stop_words='english')
     X_tfidf = tfidf.fit_transform(X_text).toarray()
+    print(f"Αρχικό σχήμα τext data: {X_text.shape}")
+    print(f"Έπειτα από επεξεργασία TF-IDF: {X_tfidf.shape}")
     
-    print(f"Original text data shape: {X_text.shape}")
-    print(f"After TF-IDF vectorization: {X_tfidf.shape}")
-    
-    # Step 3: Standardize the TF-IDF features
+    #εφαρμογη κανονικοποιησης και pca
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_tfidf)
-    
-    # Step 4: Apply PCA for dimensionality reduction
     n_components = min(50, X_scaled.shape[1])
     pca = PCA(n_components=n_components)
     X_pca = pca.fit_transform(X_scaled)
-    
     print(f"Explained variance ratio: {pca.explained_variance_ratio_[:10].sum():.2%}")
     
-    # Step 5: Create DataFrame for visualization (use first 2 components)
-    pca_df = pd.DataFrame(data=X_pca[:, :2], columns=['PC1', 'PC2'])
+    #δημιουργια dataframe για επιστροφη
+    pcadtfrm = pd.DataFrame(data=X_pca[:, :2], columns=['PC1', 'PC2'])
     if y is not None:
-        pca_df['target'] = y
-        pca_df['targetname'] = ['Positive' if i == 1 else 'Negative' for i in y]
-    
+        pcadtfrm['target'] = y
+        pcadtfrm['targetname'] = ['Positive' if i == 1 else 'Negative' for i in y]
     return {
         'X_scaled': X_scaled,
         'X_pca': X_pca,
-        'pca_df': pca_df,
+        'pcadtfrm': pcadtfrm,
         'vectorizer': tfidf,
         'scaler': scaler,
         'pca': pca,
         'feature_names': tfidf.get_feature_names_out()
     }
 
-# Setup the data for clustering
-print("\n" + "="*50)
-print("SETTING UP TEXT DATA FOR CLUSTERING")
-print("="*50)
 
-results = setup_text_data(df, text_column='review', label_column='sentiment', max_features=2000)
+#kmeans
+def kaymeans(printplots, pca, title, return_best=True):
+    numberOfRows, numberOfColumns = pca.shape
+    sses = []
+    sils = []
+    times = []
+    avg = 0.0
+    
+    bestsil = -1
+    bestk = 2
+    bestlab = None
+    bestwhole = None
+    
+    for k in range(2, 11):
+        kmeans = KMeans(n_clusters=k, init='k-means++', n_init=10, random_state=0)
+        start = time.time()
+        y_kmeans = kmeans.fit_predict(pca)
+        ktime = time.time() - start
+        avg += ktime
+        times.append(ktime)
+        IDX = kmeans.labels_
+        C = kmeans.cluster_centers_
+        
+        # Calculate SSE
+        sse_total = 0.0
+        for i in range(k):
+            for j in range(numberOfRows):
+                if IDX[j] == i:
+                    sse_total = sse_total + math.dist(pca[j], C[i])**2
+        sses.append(sse_total)
+        
+        # Calculate Silhouette score
+        sil = metrics.silhouette_score(pca, IDX)
+        sils.append(sil)
+        print(f"For {title} (kmeans) cluster k={k}, SSE={sse_total:.4f} & Silhouette={sil:.4f}")
+        
+        # Track best silhouette score
+        if sil > bestsil:
+            bestsil = sil
+            bestk = k
+            bestlab = y_kmeans.copy()
+            bestwhole = kmeans
 
-# Perform clustering on the PCA-reduced data
-kmeans = KMeans(n_clusters=2, random_state=42)
-clusters = kmeans.fit_predict(results['X_pca'])
+        if printplots == 1:
+            plt.figure(k-1)
+            plt.scatter(pca[:, 0], pca[:, 1], c=y_kmeans, cmap='viridis')
+            plt.scatter(kmeans.cluster_centers_[:, 0], kmeans.cluster_centers_[:, 1], s=300, c='red', marker='X')
+            plt.title(f'K-Means for k={k} clusters for {title} dataset')
+            plt.show()
+    
+    avg /= 9.0
+    
+    if return_best:
+        # Return best clusters along with metrics
+        return {
+            'sses': sses,
+            'sils': sils,
+            'times': times,
+            'avg_time': avg,
+            'bestk': bestk,
+            'bestsil': bestsil,
+            'bestlab': bestlab,
+            'bestwhole': bestwhole,
+            'all_labels': [kmeans.labels_ for k in range(2, 11)]  # Store all for reference
+        }
+    else:
+        return sses, sils, times, avg
 
-# Add cluster labels to the dataframe
-results['pca_df']['cluster'] = clusters
+#kmeans
+results = prepareclust(dtfrm, text_column='review', label_column='sentiment', max_features=2000)
 
-# Visualize the clusters
+print("\nRunning K-Means clustering...")
+printplots = 0  #δεν μας ενδιαφερουν τα πλοτσ τοσο
+kmeansres = kaymeans(printplots, results['X_pca'], 'IMDB Reviews', return_best=True)
+
+bestclust = kmeansres['bestlab']
+bestk = kmeansres['bestk']
+
+print(f"\nΧρησιμοποιώντας το καλύτερο k={bestk} με Silhouette={kmeansres['bestsil']:.4f}")
+results['pcadtfrm']['cluster'] = bestclust
+
+# Visualize the clusters (using best k)
 plt.figure(figsize=(12, 5))
 
 plt.subplot(1, 2, 1)
-sns.scatterplot(data=results['pca_df'], x='PC1', y='PC2', hue='targetname', alpha=0.6)
+sns.scatterplot(data=results['pcadtfrm'], x='PC1', y='PC2', hue='targetname', alpha=0.6)
 plt.title('Actual Sentiment Labels')
 
 plt.subplot(1, 2, 2)
-sns.scatterplot(data=results['pca_df'], x='PC1', y='PC2', hue='cluster', alpha=0.6, palette='Set2')
-plt.title('K-Means Clusters (k=2)')
+sns.scatterplot(data=results['pcadtfrm'], x='PC1', y='PC2', hue='cluster', alpha=0.6, palette='Set2')
+plt.title(f'K-Means Clusters (k={bestk})')
 
 plt.tight_layout()
 plt.show()
 
-# Calculate clustering performance
-actual_labels = results['pca_df']['target']
-ari = adjusted_rand_score(actual_labels, clusters)
-nmi = normalized_mutual_info_score(actual_labels, clusters)
+# Calculate performance metrics
+actual_labels = results['pcadtfrm']['target']
+ari = adjusted_rand_score(actual_labels, bestclust)
+nmi = normalized_mutual_info_score(actual_labels, bestclust)
 
-print(f"\nClustering Performance:")
+print(f"\nΑποδοτικότητα Συσταδοποίησης (k={bestk}):")
 print(f"Adjusted Rand Index: {ari:.3f}")
 print(f"Normalized Mutual Info: {nmi:.3f}")
 
 
 
-# Μερος 1
+
+#Μερος 1
 print("\n" + "="*50)
-print("PART 1: CLASSIFICATION MODELS")
+print("PART 1: Μοντέλα Κατηγοριοποιήσης")
 print("="*50)
 
-from sklearn.model_selection import train_test_split
-from sklearn.naive_bayes import GaussianNB          # <-- ΑΛΛΑΓΗ: GaussianNB
-from sklearn.svm import LinearSVC
-from sklearn.neural_network import MLPClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc
-
 # Χρησιμοποιούμε το TF-IDF (όχι PCA) για classification
-X = results['X_scaled']  # TF-IDF scaled features
-y = df['sentiment'].values
+X = results['X_scaled']  
+y = dtfrm['sentiment'].values
 
-# Split
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.3, random_state=42, stratify=y
 )
@@ -193,10 +230,8 @@ X_train, X_test, y_train, y_test = train_test_split(
 print(f"Train size: {X_train.shape}")
 print(f"Test size: {X_test.shape}")
 
-# Ορισμός μοντέλων
 models = {
-    'Naive Bayes': GaussianNB(),                    # <-- ΑΛΛΑΓΗ
-    'SVM': LinearSVC(C=1.0, max_iter=2000, random_state=42),
+    'Naive Bayes': GaussianNB(),           
     'Neural Network': MLPClassifier(
         hidden_layer_sizes=(128, 64), 
         max_iter=100, 
@@ -207,18 +242,12 @@ models = {
 }
 
 classification_results = {}
-
-# Εκπαίδευση & Αξιολόγηση
+#εκπαίδευση και αξιολόγηση
 for name, model in models.items():
     print(f"\nΕκπαίδευση {name}...")
-    
-    # Εκπαίδευση
     model.fit(X_train, y_train)
-    
-    # Πρόβλεψη
     y_pred = model.predict(X_test)
     
-    # Probabilities για ROC
     if hasattr(model, "predict_proba"):
         y_prob = model.predict_proba(X_test)[:, 1]
     elif hasattr(model, "decision_function"):
@@ -226,12 +255,10 @@ for name, model in models.items():
     else:
         y_prob = None
     
-    # Μετρικές
     acc = accuracy_score(y_test, y_pred)
     prec = precision_score(y_test, y_pred, zero_division=0)
     rec = recall_score(y_test, y_pred, zero_division=0)
     f1 = f1_score(y_test, y_pred, zero_division=0)
-    
     classification_results[name] = {
         'model': model,
         'y_pred': y_pred,
@@ -241,22 +268,17 @@ for name, model in models.items():
         'recall': rec,
         'f1': f1
     }
-    
     print(f"  Accuracy: {acc:.4f}")
     print(f"  Precision: {prec:.4f}")
     print(f"  Recall: {rec:.4f}")
     print(f"  F1-Score: {f1:.4f}")
 
 
-    # Μερος 2
-
-    print("\n" + "="*50)
-print("PART 2: CONFUSION MATRICES & ROC CURVES")
-print("="*50)
+#μερος 2
 
 fig, axes = plt.subplots(2, 3, figsize=(18, 10))
 
-# Confusion Matrices
+#πίνακες συγχησης
 for i, (name, res) in enumerate(classification_results.items()):
     row, col = i // 2, i % 2
     
@@ -268,8 +290,8 @@ for i, (name, res) in enumerate(classification_results.items()):
     axes[row, col].set_xlabel('Predicted')
     axes[row, col].set_ylabel('Actual')
 
-# ROC Curves (όλα μαζί)
-colors = ['blue', 'red', 'green', 'orange']
+#roc καμπυλες
+colors = ['blue', 'green', 'orange']
 for i, (name, res) in enumerate(classification_results.items()):
     if res['y_prob'] is not None:
         fpr, tpr, _ = roc_curve(y_test, res['y_prob'])
@@ -286,16 +308,15 @@ plt.tight_layout()
 plt.show()
 
 
-#Μερος 3
-
+#μερος 3
 print("\n" + "="*50)
 print("PART 3: ΣΥΓΚΡΙΣΗ ΜΟΝΤΕΛΩΝ")
 print("="*50)
 
-# Δημιουργία πίνακα σύγκρισης
-comparison_data = []
+#πινακες συγκρισης
+compdata = []
 for name, res in classification_results.items():
-    comparison_data.append({
+    compdata.append({
         'Model': name,
         'Accuracy': res['accuracy'],
         'Precision': res['precision'],
@@ -303,105 +324,115 @@ for name, res in classification_results.items():
         'F1-Score': res['f1']
     })
 
-comp_df = pd.DataFrame(comparison_data)
-comp_df = comp_df.sort_values('F1-Score', ascending=False)
+compdf = pd.DataFrame(compdata)
+compdf = compdf.sort_values('F1-Score', ascending=False)
 
 print("\n=== ΣΥΓΚΡΙΤΙΚΟΣ ΠΙΝΑΚΑΣ ===")
-print(comp_df.round(4).to_string(index=False))
+print(compdf.round(4).to_string(index=False))
 
-# Bar chart
-fig, ax = plt.subplots(figsize=(10, 6))
-comp_df.set_index('Model').plot(kind='bar', ax=ax, colormap='viridis')
+#οπτικοποιηση
+fig, ax = plt.subplots(figsize=(10, 4))
+compdf.set_index('Model').plot(kind='bar', ax=ax, colormap='viridis')
 plt.title('Σύγκριση Μοντέλων Classification - IMDB Reviews')
 plt.xlabel('Μοντέλα')
 plt.ylabel('Score')
 plt.xticks(rotation=0)
 plt.legend(loc='lower right')
 plt.grid(axis='y', alpha=0.3)
-
-# Προσθήκη τιμών πάνω από τις μπάρες
 for container in ax.containers:
     ax.bar_label(container, fmt='%.3f', fontsize=9)
-
 plt.tight_layout()
 plt.show()
 
-# Καλύτερο μοντέλο
-best_model = comp_df.iloc[0]
-print(f"\n🏆 Καλύτερο μοντέλο: {best_model['Model']}")
-print(f"   F1-Score: {best_model['F1-Score']:.4f}")
+#επιλογη πιο αποδοτικου μοντελου
+bstmodl = compdf.iloc[0]
+print(f"\nΚαλύτερο μοντέλο: {bstmodl['Model']}")
+print(f"F1-Score: {bstmodl['F1-Score']:.4f}")
 
 
-# Μερος 4
+#μερος 4
 print("\n" + "="*50)
-print("PART 4: ASSOCIATION RULES - WORD PAIRS")
+print("PART 4: Κανόνες συσχέτισης - Ζευγάρια λέξεων")
 print("="*50)
 
-from sklearn.feature_extraction.text import CountVectorizer
-from mlxtend.frequent_patterns import apriori, association_rules
-
-# Πάρε δείγμα για ταχύτητα (3000 reviews)
+#τυχαια δειγματοληψεια
 np.random.seed(42)
-sample_idx = np.random.choice(len(df), size=min(3000, len(df)), replace=False)
-df_sample = df.iloc[sample_idx]
+smplidx = np.random.choice(len(dtfrm), size=min(3000, len(dtfrm)), replace=False)
+dftmp = dtfrm.iloc[smplidx]
 
-# Binary matrix με τις top 80 λέξεις
+#δυαδικός πινακας με τις top 80 λέξεις
 cv = CountVectorizer(max_features=80, binary=True, stop_words='english')
-word_matrix = cv.fit_transform(df_sample['cleaned_review'])
-word_df = pd.DataFrame(word_matrix.toarray(), columns=cv.get_feature_names_out())
+wordarr = cv.fit_transform(dftmp['cleanreview'])
+wrddf = pd.DataFrame(wordarr.toarray(), columns=cv.get_feature_names_out())
 
-print(f"Διαστάσεις binary matrix: {word_df.shape}")
+print(f"Διαστάσεις δυαδικού πίνακα: {wrddf.shape}")
 
-# Apriori
-frequent_itemsets = apriori(word_df, min_support=0.05, use_colnames=True)
-print(f"Σύνολο frequent itemsets: {len(frequent_itemsets)}")
+#συνολα apriori
+itemsets = apriori(wrddf, min_support=0.05, use_colnames=True)
+print(f"Σύνολο συχνών ζευγαριών: {len(itemsets)}")
 
-rules = association_rules(frequent_itemsets, metric='lift', min_threshold=1.2)
+rules = association_rules(itemsets, metric='lift', min_threshold=1.2)
 rules = rules.sort_values('lift', ascending=False)
 
-print(f"Σύνολο κανόνων: {len(rules)}")
+def removedoubles(rules_df):
+    seen = set()
+    mask = []
+    
+    for idx, row in rules_df.iterrows():
+        #συγχωνευση διπλωτυπων
+        ant = frozenset(row['antecedents'])
+        con = frozenset(row['consequents'])
+        combined = ant.union(con)
+        if combined not in seen:
+            seen.add(combined)
+            mask.append(True)
+        else:
+            mask.append(False)
+    return rules_df[mask].reset_index(drop=True)
+    
+rules_unique = removedoubles(rules)
+print(f"Σύνολο αρχικών κανόνων: {len(rules)}")
+print(f"Σύνολο ΜΟΝΑΔΙΚΩΝ κανόνων: {len(rules_unique)}")
 
-# Εμφάνιση top 15
-print("\n🔹 Top 15 Κανόνες Συσχέτισης Λέξεων:")
-top_rules = rules.head(15)[['antecedents', 'consequents', 'support', 'confidence', 'lift']].copy()
-top_rules['antecedents'] = top_rules['antecedents'].apply(lambda x: ', '.join(list(x)))
-top_rules['consequents'] = top_rules['consequents'].apply(lambda x: ', '.join(list(x)))
-print(top_rules.to_string(index=False))
+#οπτικοποίηση κορυφαίων ζεύγων
+print("\nΠρώτοι 15 κανόνες συσχέτισης λέξεων:")
+tophits = rules_unique.head(15)[['antecedents', 'consequents', 'support', 'confidence', 'lift']].copy()
+tophits['antecedents'] = tophits['antecedents'].apply(lambda x: ', '.join(sorted(list(x))))
+tophits['consequents'] = tophits['consequents'].apply(lambda x: ', '.join(sorted(list(x))))
 
-# Οπτικοποίηση
-plt.figure(figsize=(10, 6))
-top_plot = rules.head(10)
-labels = [f"{list(a)[0]} → {list(c)[0]}" for a, c in zip(top_plot['antecedents'], top_plot['consequents'])]
+print(tophits.to_string(index=False))
+plt.figure(figsize=(12, 6))
+top_plot = rules_unique.head(10)
+labels = []
+for a, c in zip(top_plot['antecedents'], top_plot['consequents']):
+    ant_str = ', '.join(sorted(list(a)))
+    con_str = ', '.join(sorted(list(c)))
+    labels.append(f"{ant_str} → {con_str}")
 plt.barh(range(len(top_plot)), top_plot['lift'], color='purple', alpha=0.7)
 plt.yticks(range(len(top_plot)), labels)
 plt.xlabel('Lift')
-plt.title('Top 10 Word Association Rules')
+plt.title('Πρώτοι 10 μοναδικοί κανόνες συσχέτισης λέξεων')
 plt.tight_layout()
 plt.show()
 
-# Μερος 5
-
+#μερος 5
 print("\n" + "="*50)
-print("PART 5: BIG DATA PROCESSING (MapReduce με Pandas)")
+print("PART 5: Διαχείρηση δεδομένων μεγάλης κλίμακας")
 print("="*50)
 
-# ==========================================
-# MapReduce 1: Μέσο μήκος review ανά sentiment
-# ==========================================
-print("=== 1. ΜΕΣΟ ΜΗΚΟΣ REVIEW ΑΝΑ SENTIMENT (MapReduce) ===")
+#μέσο μήκος κριτκής ανά κατηγορία(καλή/κακή)
 
-# Map φάση: δημιουργία (key, value) ζευγών
-def map_length(row):
+#δημιουργία χάρτη
+def maplen(row):
     sentiment = 'Positive' if row['sentiment'] == 1 else 'Negative'
     length = len(row['review'].split())
     return [(sentiment, (length, 1))]
 
-# Εκτέλεση Map
 mapped = []
-for _, row in df.iterrows():
-    mapped.extend(map_length(row))
+for _, row in dtfrm.iterrows():
+    mapped.extend(maplen(row))
 
-# Reduce φάση: ομαδοποίηση και υπολογισμός μέσου όρου
+#φάση μείωσης
 from collections import defaultdict
 reduced = defaultdict(lambda: {'total_length': 0, 'count': 0})
 
@@ -409,110 +440,77 @@ for key, (length, count) in mapped:
     reduced[key]['total_length'] += length
     reduced[key]['count'] += count
 
+#εκτύπωση
 print(f"{'Sentiment':<12} {'Avg Length':<12} {'Count':<8}")
 print("-" * 32)
 for sentiment in ['Positive', 'Negative']:
     avg = reduced[sentiment]['total_length'] / reduced[sentiment]['count']
     print(f"{sentiment:<12} {avg:<12.1f} {reduced[sentiment]['count']:<8}")
 
-# ==========================================
-# MapReduce 2: Word Count (Top 20 λέξεις)
-# ==========================================
-print("\n=== 2. TOP 20 ΛΕΞΕΙΣ (MapReduce Word Count) ===")
 
-import re
-from collections import Counter
+#ευρεση 20 πιο συχνων λεξεων
 
-stop_words = {'the','and','this','that','with','from','they','have','were','been',
-              'what','when','for','are','was','but','not','you','all','can','had',
-              'has','her','him','his','how','its','may','nor','once','our','out',
-              'own','per','say','she','some','than','their','them','then','there',
-              'these','they','this','upon','was','were','what','when','who','will',
-              'with','would','your','just','about','like','which','also','very'}
-
-# Map φάση
-def map_words(review):
+#δημιουργία χάρτη
+def mapwrds(review):
     words = re.findall(r'\b[a-zA-Z]+\b', review.lower())
     return [(w, 1) for w in words if len(w) > 3 and w not in stop_words]
+pairs = []
+for review in dtfrm['review']:
+    pairs.extend(mapwrds(review))
 
-# Εκτέλεση Map
-word_pairs = []
-for review in df['review']:
-    word_pairs.extend(map_words(review))
-
-# Reduce φάση
+#φάση μείωσης
 word_counts = Counter()
-for word, count in word_pairs:
+for word, count in pairs:
     word_counts[word] += count
 
-# Top 20
+#εκτύπωση
 print(f"{'Λέξη':<20} {'Count':<8}")
 print("-" * 28)
 for word, count in word_counts.most_common(20):
     print(f"{word:<20} {count:<8}")
 
-# ==========================================
-# MapReduce 3: Reviews ανά έτος (αν υπάρχουν ημερομηνίες)
-# ==========================================
-print("\n=== 3. TOP 5 ΜΕΓΑΛΥΤΕΡΑ REVIEWS (MapReduce) ===")
+#μεγαλύτερες κριτηκές
 
-# Map: (μήκος, review)
-def map_top_reviews(row):
-    return [(len(row['review']), row['review'][:80])]
+#δημιουργία χάρτη
+def maplenrev(row):
+    return [(len(row['cleanreview']), row['cleanreview'][:80])]
 
-mapped_reviews = []
-for _, row in df.iterrows():
-    mapped_reviews.extend(map_top_reviews(row))
+mappedrev = []
+for _, row in dtfrm.iterrows():
+    mappedrev.extend(maplenrev(row))
 
-# Reduce: ταξινόμηση
-mapped_reviews.sort(key=lambda x: x[0], reverse=True)
+#φάση μείωσης/ταξινόμισης
+mappedrev.sort(key=lambda x: x[0], reverse=True)
 
 print(f"{'Length':<8} {'Review (first 80 chars)':<80}")
 print("-" * 88)
-for length, review in mapped_reviews[:5]:
+for length, review in mappedrev[:5]:
     print(f"{length:<8} {review:<80}")
 
 
-    # Συμπερασματα
 
-    print("\n" + "="*60)
+
+print("\n" + "="*60)
 print("               ΤΕΛΙΚΑ ΣΥΜΠΕΡΑΣΜΑΤΑ")
 print("="*60)
 
-best_model_name = comp_df.iloc[0]['Model']
-best_f1 = comp_df.iloc[0]['F1-Score']
+best = compdf.iloc[0]['Model']
+bestf1 = compdf.iloc[0]['F1-Score']
 
 print(f"""
-📊 1. ΔΕΔΟΜΕΝΑ:
-   • Σύνολο reviews: {len(df):,}
-   • Θετικά: {sum(df['sentiment']):,} ({sum(df['sentiment'])/len(df)*100:.1f}%)
-   • Αρνητικά: {len(df)-sum(df['sentiment']):,} ({(len(df)-sum(df['sentiment']))/len(df)*100:.1f}%)
-   • Μέσο μήκος θετικού review: {reduced['Positive']['total_length']/reduced['Positive']['count']:.1f} λέξεις
-   • Μέσο μήκος αρνητικού review: {reduced['Negative']['total_length']/reduced['Negative']['count']:.1f} λέξεις
+Μερικά γενικά στοιχεία για τα δεδομένα:
+Σύνολο reviews: {len(dtfrm):,}
+Θετικά: {sum(dtfrm['sentiment']):,} ({sum(dtfrm['sentiment'])/len(dtfrm)*100:.1f}%)
+Αρνητικά: {len(dtfrm)-sum(dtfrm['sentiment']):,} ({(len(dtfrm)-sum(dtfrm['sentiment']))/len(dtfrm)*100:.1f}%)
+Μέσο μήκος θετικού review: {reduced['Positive']['total_length']/reduced['Positive']['count']:.1f} λέξεις
+Μέσο μήκος αρνητικού review: {reduced['Negative']['total_length']/reduced['Negative']['count']:.1f} λέξεις
 
-🏆 2. ΑΠΟΔΟΣΗ ΜΟΝΤΕΛΩΝ:
-   • 1η θέση: {comp_df.iloc[0]['Model']} (F1={comp_df.iloc[0]['F1-Score']:.4f})
-   • 2η θέση: {comp_df.iloc[1]['Model']} (F1={comp_df.iloc[1]['F1-Score']:.4f})
-   • 3η θέση: {comp_df.iloc[2]['Model']} (F1={comp_df.iloc[2]['F1-Score']:.4f})
-   • 4η θέση: {comp_df.iloc[3]['Model']} (F1={comp_df.iloc[3]['F1-Score']:.4f})
+Σύγκριση μοντέλων βάση βαθμολογίας f1 (βάθρο):
+1η θέση: {compdf.iloc[0]['Model']} (F1={compdf.iloc[0]['F1-Score']:.4f})
+2η θέση: {compdf.iloc[1]['Model']} (F1={compdf.iloc[1]['F1-Score']:.4f})
+3η θέση: {compdf.iloc[2]['Model']} (F1={compdf.iloc[2]['F1-Score']:.4f})
 
-📊 3. CLUSTERING (K-Means):
-   • Adjusted Rand Index: {ari:.4f}
-   • Normalized Mutual Info: {nmi:.4f}
-
-💡 4. INSIGHTS:
-   • Το sentiment analysis σε reviews ταινιών επιτυγχάνεται με >84% ακρίβεια
-   • Το {best_model_name} υπερέχει λόγω μη-γραμμικής φύσης του κειμένου
-   • Οι θετικές κριτικές είναι ελαφρώς μεγαλύτερες από τις αρνητικές
-   • Top λέξεις: "movie", "film", "good", "great" (θετικές), "bad", "worst" (αρνητικές)
-   • Οι Association Rules έδειξαν ζεύγη όπως: "ive→seen", "year→old", "dont→like"
-   • Το K-Means κατάφερε να διαχωρίσει τα reviews χωρίς επίβλεψη (ARI={ari:.3f})
-   • Το MapReduce επεξεργάστηκε αποδοτικά τον μεγάλο όγκο δεδομένων
-
-🔧 5. ΠΡΑΚΤΙΚΕΣ ΕΦΑΡΜΟΓΕΣ:
-   • Αυτόματη κατηγοριοποίηση reviews σε IMDb/Rotten Tomatoes
-   • Ανάλυση τάσεων κοινού για νέες κυκλοφορίες ταινιών
-   • Social media monitoring για εταιρείες παραγωγής
-   • Content-based recommendation systems
-   • Customer feedback analysis σε πραγματικό χρόνο
+Απόδοση συσταδοποίησης kmeans:
+Adjusted Rand Index: {ari:.4f}
+Normalized Mutual Info: {nmi:.4f}
 """)

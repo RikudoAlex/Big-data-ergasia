@@ -1,20 +1,161 @@
-Loaded 25000 reviews
-Positive: 12500
-Negative: 12500
+Dataset downloaded to: C:\Users\user\.cache\kagglehub\datasets\abdallahwagih\imdb-movie-reviews\versions\1
+Φορτώθηκαν 25000 reviews
+Θετικά: 12500
+Αρνητικά: 12500
                                               review  sentiment
 0  Bromwell High is a cartoon comedy. It ran at t...          1
 1  Homelessness (or Houselessness as George Carli...          1
 2  Brilliant over-acting by Lesley Ann Warren. Be...          1
 3  This is easily the most underrated film inn th...          1
 4  This is not the typical Mel Brooks film. It wa...          1
-
-==================================================
-SETTING UP TEXT DATA FOR CLUSTERING
-==================================================
-Original text data shape: (25000,)
-After TF-IDF vectorization: (25000, 2000)
+Αρχικό σχήμα τext data: (25000,)
+Έπειτα από επεξεργασία TF-IDF: (25000, 2000)
 Explained variance ratio: 1.93%
 
-Clustering Performance:
-Adjusted Rand Index: 0.107
-Normalized Mutual Info: 0.079
+Running K-Means clustering...
+For IMDB Reviews (kmeans) cluster k=2, SSE=2815804.7123 & Silhouette=0.0423
+For IMDB Reviews (kmeans) cluster k=3, SSE=2752295.1437 & Silhouette=0.0225
+For IMDB Reviews (kmeans) cluster k=4, SSE=2707661.4413 & Silhouette=0.0239
+For IMDB Reviews (kmeans) cluster k=5, SSE=2668663.5245 & Silhouette=0.0193
+For IMDB Reviews (kmeans) cluster k=6, SSE=2633597.5951 & Silhouette=0.0208
+For IMDB Reviews (kmeans) cluster k=7, SSE=2592050.7243 & Silhouette=0.0203
+For IMDB Reviews (kmeans) cluster k=8, SSE=2559106.7167 & Silhouette=0.0199
+For IMDB Reviews (kmeans) cluster k=9, SSE=2532709.5861 & Silhouette=0.0207
+For IMDB Reviews (kmeans) cluster k=10, SSE=2498993.7910 & Silhouette=0.0245
+
+Using best k=2 with Silhouette=0.0423
+
+Clustering Performance (k=2):
+Adjusted Rand Index: 0.113
+Normalized Mutual Info: 0.084
+
+==================================================
+PART 1: Μοντέλα Κατηγοριοποιήσης
+==================================================
+Train size: (17500, 2000)
+Test size: (7500, 2000)
+
+Εκπαίδευση Naive Bayes...
+  Accuracy: 0.7993
+  Precision: 0.8009
+  Recall: 0.7968
+  F1-Score: 0.7988
+
+Εκπαίδευση Neural Network...
+  Accuracy: 0.8452
+  Precision: 0.8442
+  Recall: 0.8467
+  F1-Score: 0.8454
+
+Εκπαίδευση Decision Tree...
+  Accuracy: 0.7239
+  Precision: 0.6921
+  Recall: 0.8064
+  F1-Score: 0.7449
+
+==================================================
+PART 3: ΣΥΓΚΡΙΣΗ ΜΟΝΤΕΛΩΝ
+==================================================
+
+=== ΣΥΓΚΡΙΤΙΚΟΣ ΠΙΝΑΚΑΣ ===
+         Model  Accuracy  Precision  Recall  F1-Score
+Neural Network    0.8452     0.8442  0.8467    0.8454
+   Naive Bayes    0.7993     0.8009  0.7968    0.7988
+ Decision Tree    0.7239     0.6921  0.8064    0.7449
+
+Καλύτερο μοντέλο: Neural Network
+F1-Score: 0.8454
+
+==================================================
+PART 4: Κανόνες συσχέτισης - Ζευγάρια λέξεων
+==================================================
+Διαστάσεις δυαδικού πίνακα: (3000, 80)
+C:\Users\user\AppData\Local\Programs\Python\Python311\Lib\site-packages\mlxtend\frequent_patterns\fpcommon.py:175: DeprecationWarning: DataFrames with non-bool types result in worse computationalperformance and their support might be discontinued in the future.Please use a DataFrame with bool type
+  warnings.warn(
+Σύνολο συχνών ζευγαριών: 1463
+Σύνολο αρχικών κανόνων: 3934
+Σύνολο ΜΟΝΑΔΙΚΩΝ κανόνων: 923
+
+Πρώτοι 15 κανόνες συσχέτισης λέξεων:
+    antecedents     consequents  support  confidence     lift
+           seen             ive 0.058333    0.285016 2.869291
+           year             old 0.056667    0.303030 2.443793
+           dont      know, like 0.056000    0.224900 1.927711
+           dont     know, movie 0.066000    0.265060 1.902346
+     dont, film            know 0.055000    0.375000 1.871880
+character, like       film, way 0.054000    0.310940 1.814828
+           dont            know 0.090333    0.362784 1.810904
+     film, like       time, way 0.060333    0.214709 1.784288
+     film, time     like, scene 0.056333    0.231190 1.782957
+    like, think            dont 0.056667    0.442708 1.777945
+           look      like, make 0.060000    0.322581 1.775673
+     make, time character, film 0.053000    0.360544 1.755897
+     film, good     like, scene 0.052667    0.227011 1.750731
+    film, thing      good, like 0.053000    0.363844 1.749252
+            way character, make 0.058333    0.226684 1.748205
+
+==================================================
+PART 5: BIG DATA PROCESSING (MapReduce με Pandas)
+==================================================
+Sentiment    Avg Length   Count   
+--------------------------------
+Positive     236.7        12500   
+Negative     230.9        12500   
+Λέξη                 Count   
+----------------------------
+movie                44047   
+film                 40159   
+like                 20281   
+good                 15147   
+time                 12727   
+even                 12655   
+would                12436   
+story                11988   
+really               11738   
+well                 10667   
+much                 9764    
+people               9287    
+also                 9159    
+first                9064    
+great                9060    
+made                 8364    
+make                 8025    
+could                7922    
+movies               7668    
+think                7297    
+Length   Review (first 80 chars)                                                         
+----------------------------------------------------------------------------------------
+9107     match tag team table match bubba ray spike dudley eddie guerrero chris benoit bu
+6461     titanic directed james cameron present fictional love story historical setting t
+6343     attention spoilersfirst let say rob roy one best film amazing achievement involv
+5777     youve probably heard bit new disney dub miyazakis classic film laputa castle sky
+5675     praised atlantisthelostempire disney adventure adult dont think soat least think
+
+============================================================
+               ΤΕΛΙΚΑ ΣΥΜΠΕΡΑΣΜΑΤΑ
+============================================================
+
+Μερικά γενικά στοιχεία για τα δεδομένα:
+Σύνολο reviews: 25,000
+Θετικά: 12,500 (50.0%)
+Αρνητικά: 12,500 (50.0%)
+Μέσο μήκος θετικού review: 236.7 λέξεις
+Μέσο μήκος αρνητικού review: 230.9 λέξεις
+
+Σύγκριση μοντέλων βάση βαθμολογίας f1 (βάθρο):
+1η θέση: Neural Network (F1=0.8454)
+2η θέση: Naive Bayes (F1=0.7988)
+3η θέση: Decision Tree (F1=0.7449)
+
+Απόδοση συσταδοποίησης kmeans:
+Adjusted Rand Index: 0.1128
+Normalized Mutual Info: 0.0836
+
+Μερικά συμπεράσματα:
+- Το sentiment analysis σε reviews ταινιών επιτυγχάνεται με >84% ακρίβεια
+- Το Neural Network υπερέχει λόγω μη-γραμμικής φύσης του κειμένου
+- Οι θετικές κριτικές είναι ελαφρώς μεγαλύτερες από τις αρνητικές
+- Top λέξεις: "movie", "film", "good", "great" (θετικές), "bad", "worst" (αρνητικές)
+- Οι Association Rules έδειξαν ζεύγη όπως: "ive→seen", "year→old", "dont→like"
+- Το K-Means κατάφερε να διαχωρίσει τα reviews χωρίς επίβλεψη (ARI=0.113)
+- Το MapReduce επεξεργάστηκε αποδοτικά τον μεγάλο όγκο δεδομένων
